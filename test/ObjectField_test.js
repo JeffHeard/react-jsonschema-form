@@ -1,8 +1,8 @@
 import React from "react";
-import { expect } from "chai";
-import { Simulate } from "react-addons-test-utils";
+import {expect} from "chai";
+import {Simulate} from "react-addons-test-utils";
 
-import { createFormComponent, createSandbox } from "./test_utils";
+import {createFormComponent, createSandbox} from "./test_utils";
 
 
 describe("ObjectField", () => {
@@ -66,7 +66,7 @@ describe("ObjectField", () => {
     it("should render a customized description", () => {
       const CustomDescriptionField = ({description}) => <div id="custom">{description}</div>;
 
-      const {node} = createFormComponent({schema, DescriptionField: CustomDescriptionField});
+      const {node} = createFormComponent({schema, fields: {DescriptionField: CustomDescriptionField}});
       expect(node.querySelector("fieldset > #custom").textContent)
       .to.eql("my description");
     });
@@ -146,36 +146,57 @@ describe("ObjectField", () => {
       type: "object",
       properties: {
         foo: {type: "string"},
-        bar: {type: "string"}
+        bar: {type: "string"},
+        baz: {type: "string"},
+        qux: {type: "string"}
       }
     };
 
     it("should use provided order", () => {
       const {node} = createFormComponent({schema, uiSchema: {
-        "ui:order": ["bar", "foo"]
+        "ui:order": ["baz", "qux", "bar", "foo"]
       }});
       const labels = [].map.call(
         node.querySelectorAll(".field > label"), l => l.textContent);
 
-      expect(labels).eql(["bar", "foo"]);
+      expect(labels).eql(["baz", "qux", "bar", "foo"]);
     });
 
-    it("should throw when order list length mismatches", () => {
+    it("should insert unordered properties at wildcard position", () => {
       const {node} = createFormComponent({schema, uiSchema: {
-        "ui:order": ["bar", "foo", "baz?"]
+        "ui:order": ["baz", "*", "foo"]
+      }});
+      const labels = [].map.call(
+        node.querySelectorAll(".field > label"), l => l.textContent);
+
+      expect(labels).eql(["baz", "bar", "qux", "foo"]);
+    });
+
+    it("should throw when order list contains an extraneous property", () => {
+      const {node} = createFormComponent({schema, uiSchema: {
+        "ui:order": ["baz", "qux", "bar", "wut?", "foo", "huh?"]
       }});
 
       expect(node.querySelector(".config-error").textContent)
-        .to.match(/should match object properties length/);
+        .to.match(/contains extraneous properties 'wut\?', 'huh\?'/);
     });
 
-    it("should throw when order and properties lists differs", () => {
+    it("should throw when order list misses an existing property", () => {
       const {node} = createFormComponent({schema, uiSchema: {
-        "ui:order": ["bar", "wut?"]
+        "ui:order": ["baz", "bar"]
       }});
 
       expect(node.querySelector(".config-error").textContent)
-        .to.match(/does not match object properties list/);
+        .to.match(/does not contain properties 'foo', 'qux'/);
+    });
+
+    it("should throw when more than one wildcard is present", () => {
+      const {node} = createFormComponent({schema, uiSchema: {
+        "ui:order": ["baz", "*", "bar", "*"]
+      }});
+
+      expect(node.querySelector(".config-error").textContent)
+        .to.match(/contains more than one wildcard/);
     });
 
     it("should order referenced schema definitions", () => {
@@ -228,6 +249,14 @@ describe("ObjectField", () => {
     });
 
     it("should render the widget with the expected id", () => {
+      const schema = {
+        type: "object",
+        properties: {
+          foo: {type: "string"},
+          bar: {type: "string"}
+        }
+      };
+
       const {node} = createFormComponent({schema, uiSchema: {
         "ui:order": ["bar", "foo"]
       }});
@@ -235,6 +264,51 @@ describe("ObjectField", () => {
       const ids = [].map.call(node.querySelectorAll("input[type=text]"),
         (node) => node.id);
       expect(ids).eql(["root_bar", "root_foo"]);
+    });
+  });
+
+  describe("Title", () => {
+    const TitleField = props => <div id={`title-${props.title}`}/>;
+
+    const fields = {TitleField};
+
+    it("should pass field name to TitleField if there is no title", () => {
+      const schema = {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "object",
+            "properties": {
+            }
+          }
+        }
+      };
+
+      const {node} = createFormComponent({schema, fields});
+      expect(node.querySelector("#title-object")).to.not.be.null;
+    });
+
+    it("should pass schema title to TitleField", () => {
+      const schema = {
+        "type": "object",
+        "properties": {
+        },
+        "title": "test"
+      };
+
+      const {node} = createFormComponent({schema, fields});
+      expect(node.querySelector("#title-test")).to.not.be.null;
+    });
+
+    it("should pass empty schema title to TitleField", () => {
+      const schema = {
+        "type": "object",
+        "properties": {
+        },
+        "title": ""
+      };
+      const {node} = createFormComponent({schema, fields});
+      expect(node.querySelector("#title-")).to.be.null;
     });
   });
 });

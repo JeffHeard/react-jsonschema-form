@@ -1,13 +1,14 @@
 import React from "react";
 
-import { expect } from "chai";
-import { Simulate } from "react-addons-test-utils";
+import {expect} from "chai";
+import {Simulate} from "react-addons-test-utils";
 
-import { createFormComponent, createSandbox } from "./test_utils";
+import {createFormComponent, createSandbox} from "./test_utils";
 
 
 describe("ArrayField", () => {
   let sandbox;
+  const CustomComponent = () => <div id="custom"/>;
 
   beforeEach(() => {
     sandbox = createSandbox();
@@ -70,6 +71,17 @@ describe("ArrayField", () => {
         .to.eql("my description");
     });
 
+    it("should render a customized file widget", () => {
+      const {node} = createFormComponent({schema,
+        uiSchema: {
+          "ui:widget": "files"
+        },
+        widgets: {FileWidget: CustomComponent}
+      });
+      expect(node.querySelector("#custom"))
+        .to.exist;
+    });
+
     it("should contain no field in the list by default", () => {
       const {node} = createFormComponent({schema});
 
@@ -82,6 +94,12 @@ describe("ArrayField", () => {
 
       expect(node.querySelector(".array-item-add button"))
         .not.eql(null);
+    });
+
+    it("should not have an add button if addable is false", () => {
+      const {node} = createFormComponent({schema, uiSchema: {"ui:options": {addable: false}}});
+
+      expect(node.querySelector(".array-item-add button")).to.be.null;
     });
 
     it("should add a new field when clicking the add button", () => {
@@ -157,6 +175,15 @@ describe("ArrayField", () => {
       expect(moveDownBtns[1].disabled).eql(true);
     });
 
+    it("should not show move up/down buttons if orderable is false", () => {
+      const {node} = createFormComponent({schema, formData: ["foo", "bar"], uiSchema: {"ui:options": {orderable: false}}});
+      const moveUpBtns = node.querySelector(".array-item-move-up");
+      const moveDownBtns = node.querySelector(".array-item-move-down");
+
+      expect(moveUpBtns).to.be.null;
+      expect(moveDownBtns).to.be.null;
+    });
+
     it("should remove a field from the list", () => {
       const {node} = createFormComponent({schema, formData: ["foo", "bar"]});
       const dropBtns = node.querySelectorAll(".array-item-remove");
@@ -166,6 +193,13 @@ describe("ArrayField", () => {
       const inputs = node.querySelectorAll(".field-string input[type=text]");
       expect(inputs).to.have.length.of(1);
       expect(inputs[0].value).eql("bar");
+    });
+
+    it("should not show remove button if removable is false", () => {
+      const {node} = createFormComponent({schema, formData: ["foo", "bar"], uiSchema: {"ui:options": {removable: false}}});
+      const dropBtn = node.querySelector(".array-item-remove");
+
+      expect(dropBtn).to.be.null;
     });
 
     it("should force revalidation when a field is removed", () => {
@@ -180,7 +214,7 @@ describe("ArrayField", () => {
 
       try {
         Simulate.submit(node);
-      } catch(e) {
+      } catch (e) {
         // Silencing error thrown as failure is expected here
       }
 
@@ -354,6 +388,23 @@ describe("ArrayField", () => {
         const {node} = createFormComponent({schema, uiSchema});
 
         expect(node.querySelector(".checkboxes").id).eql("root");
+      });
+
+      it("should support inline checkboxes", () => {
+        const {node} = createFormComponent({
+          schema,
+          uiSchema: {
+            "ui:widget": {
+              component: "checkboxes",
+              options: {
+                inline: true
+              }
+            }
+          }
+        });
+
+        expect(node.querySelectorAll(".checkbox-inline"))
+          .to.have.length.of(3);
       });
     });
   });
@@ -542,8 +593,8 @@ describe("ArrayField", () => {
       const numInput =
           node.querySelector("fieldset .field-number input[type=text]");
 
-      Simulate.change(strInput, {target: { value: "bar" }});
-      Simulate.change(numInput, {target: { value: "101" }});
+      Simulate.change(strInput, {target: {value: "bar"}});
+      Simulate.change(numInput, {target: {value: "101"}});
 
       expect(comp.state.formData).eql(["bar", 101]);
     });
@@ -557,6 +608,21 @@ describe("ArrayField", () => {
           node.querySelector("fieldset .field-string input[type=text]");
       expect(addInput.id).eql("root_2");
       expect(addInput.value).eql("bar");
+    });
+
+    it("should have an add button if additionalItems is an object", () => {
+      const {node} = createFormComponent({schema: schemaAdditional});
+      expect(node.querySelector(".array-item-add button")).not.to.be.null;
+    });
+
+    it("should not have an add button if additionalItems is not set", () => {
+      const {node} = createFormComponent({schema});
+      expect(node.querySelector(".array-item-add button")).to.be.null;
+    });
+
+    it("should not have an add button if addable is false", () => {
+      const {node} = createFormComponent({schema, uiSchema: {"ui:options": {addable: false}}});
+      expect(node.querySelector(".array-item-add button")).to.be.null;
     });
 
     describe("operations for additional items", () => {
@@ -623,6 +689,51 @@ describe("ArrayField", () => {
       });
 
       expect(comp.state.formData).eql([1, 2]);
+    });
+  });
+
+  describe("Title", () => {
+    const TitleField = props => <div id={`title-${props.title}`}/>;
+
+    const fields = {TitleField};
+
+    it("should pass field name to TitleField if there is no title", () => {
+      const schema = {
+        "type": "object",
+        "properties": {
+          "array": {
+            "type": "array",
+            "items": {
+            }
+          }
+        }
+      };
+
+      const {node} = createFormComponent({schema, fields});
+      expect(node.querySelector("#title-array")).to.not.be.null;
+    });
+
+    it("should pass schema title to TitleField", () => {
+      const schema = {
+        "type": "array",
+        "title": "test",
+        "items": {
+        }
+      };
+
+      const {node} = createFormComponent({schema, fields});
+      expect(node.querySelector("#title-test")).to.not.be.null;
+    });
+
+    it("should pass empty schema title to TitleField", () => {
+      const schema = {
+        "type": "array",
+        "title": "",
+        "items": {
+        }
+      };
+      const {node} = createFormComponent({schema, fields});
+      expect(node.querySelector("#title-")).to.be.null;
     });
   });
 });
